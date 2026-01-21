@@ -6,13 +6,20 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 /**
+ * API error response data structure.
+ */
+export interface ApiErrorData {
+  detail?: string;
+  [key: string]: unknown;
+}
+/**
  * Custom error class for API errors.
  */
 export class ApiError extends Error {
   constructor(
     public status: number,
     public statusText: string,
-    public data?: any
+    public data?: ApiErrorData
   ) {
     super(`API Error: ${status} ${statusText}`);
     this.name = "ApiError";
@@ -297,3 +304,4 @@ export const chatApi = {
     return fetchApi<Message[]>(`/api/chat/conversations/${conversationId}/messages`);
   },
 };
+

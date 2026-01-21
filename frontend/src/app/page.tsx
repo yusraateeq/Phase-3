@@ -19,7 +19,6 @@ import {
   Zap,
   Hammer,
   Flame,
-  Construction,
   Terminal
 } from "lucide-react";
 

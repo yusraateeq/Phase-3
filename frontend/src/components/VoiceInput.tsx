@@ -1,7 +1,7 @@
 "use client";
 
 import "regenerator-runtime/runtime";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition";
 import { Mic, MicOff } from "lucide-react";
 import { Button } from "@/components/ui/button";

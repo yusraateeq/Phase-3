@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Send, User, Bot, Loader2 } from "lucide-react";
-import { chatApi, Message } from "@/lib/api";
+import { chatApi, ApiError, Message } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
@@ -57,9 +57,9 @@ export function ChatComponent({ initialConversationId }: ChatComponentProps) {
             };
 
             setMessages((prev) => [...prev, botMessage]);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Chat error:", error);
-            const detail = error.data?.detail || "I'm sorry, I couldn't process that. Please try again.";
+            const detail = error instanceof ApiError ? error.data?.detail : "I'm sorry, I couldn't process that. Please try again.";
             const errorMessage: Partial<Message> = {
                 role: "assistant",
                 content: detail,
@@ -143,3 +143,6 @@ export function ChatComponent({ initialConversationId }: ChatComponentProps) {
         </div>
     );
 }
+
+
+
