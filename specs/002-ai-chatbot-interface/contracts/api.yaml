@@ -1,0 +1,297 @@
+# Phase III API Contract: AI Chatbot Interface
+
+## 1. API Overview
+
+### 1.1 Version Information
+- **API Version**: v1
+- **Base Path**: `/api/v1`
+- **Protocol**: HTTPS
+- **Content-Type**: `application/json`
+
+### 1.2 Authentication
+- **Scheme**: JWT Bearer Token
+- **Header**: `Authorization: Bearer {token}`
+- **Token Source**: Same as Phase II authentication system
+- **Validation**: All endpoints require valid JWT token
+
+## 2. New Endpoints
+
+### 2.1 Chat Endpoint
+#### `POST /api/v1/chat`
+Processes natural language input and manages todo items through AI.
+
+**Request Headers:**
+```
+Authorization: Bearer {jwt_token}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "message": "String - Natural language command (required)",
+  "conversation_id": "String (optional) - Existing conversation ID, creates new if not provided"
+}
+```
+
+**Request Body Schema:**
+```yaml
+type: object
+required:
+  - message
+properties:
+  message:
+    type: string
+    description: Natural language command from user
+    minLength: 1
+    maxLength: 1000
+  conversation_id:
+    type: string
+    description: Existing conversation ID (optional)
+    pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    nullable: true
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "response": "AI-generated response message",
+  "conversation_id": "abc123...",
+  "actions_taken": [
+    {
+      "action": "add_task",
+      "task_id": "def456...",
+      "details": "Task 'Buy groceries' created successfully"
+    }
+  ],
+  "metadata": {
+    "processing_time": 1250,
+    "model_used": "gpt-4-turbo-preview"
+  }
+}
+```
+
+**Error Responses:**
+- `400 Bad Request`: Invalid request body format
+- `401 Unauthorized`: Invalid or expired JWT token
+- `429 Too Many Requests`: Rate limit exceeded
+- `500 Internal Server Error`: AI service unavailable
+
+**Response Schema (Success):**
+```yaml
+type: object
+required:
+  - success
+  - response
+  - conversation_id
+properties:
+  success:
+    type: boolean
+    description: Whether the operation was successful
+  response:
+    type: string
+    description: AI-generated response to user
+  conversation_id:
+    type: string
+    description: ID of the conversation
+    pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+  actions_taken:
+    type: array
+    items:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: ["add_task", "update_task", "delete_task", "list_tasks", "none"]
+        task_id:
+          type: string
+          pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          nullable: true
+        details:
+          type: string
+          description: Description of the action taken
+  metadata:
+    type: object
+    properties:
+      processing_time:
+        type: integer
+        description: Time taken for AI processing in milliseconds
+      model_used:
+        type: string
+        description: AI model used for processing
+```
+
+### 2.2 Conversations Endpoints
+
+#### `GET /api/v1/conversations`
+Retrieves conversation history for the authenticated user.
+
+**Request Headers:**
+```
+Authorization: Bearer {jwt_token}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "conversations": [
+    {
+      "id": "abc123...",
+      "title": "Task management session",
+      "created_at": "2023-10-15T10:30:00Z",
+      "updated_at": "2023-10-15T11:45:00Z",
+      "is_active": true
+    }
+  ]
+}
+```
+
+**Response Schema:**
+```yaml
+type: object
+required:
+  - conversations
+properties:
+  conversations:
+    type: array
+    items:
+      type: object
+      required:
+        - id
+        - title
+        - created_at
+        - updated_at
+        - is_active
+      properties:
+        id:
+          type: string
+          pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        title:
+          type: string
+          maxLength: 200
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        is_active:
+          type: boolean
+```
+
+#### `GET /api/v1/conversations/{conversation_id}/messages`
+Retrieves messages for a specific conversation.
+
+**Path Parameters:**
+- `{conversation_id}`: UUID of the conversation
+
+**Request Headers:**
+```
+Authorization: Bearer {jwt_token}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "messages": [
+    {
+      "id": "def456...",
+      "role": "user",
+      "content": "Add a meeting at 2 PM",
+      "timestamp": "2023-10-15T10:30:00Z",
+      "metadata": {
+        "processed_by_ai": true
+      }
+    }
+  ]
+}
+```
+
+**Response Schema:**
+```yaml
+type: object
+required:
+  - messages
+properties:
+  messages:
+    type: array
+    items:
+      type: object
+      required:
+        - id
+        - role
+        - content
+        - timestamp
+      properties:
+        id:
+          type: string
+          pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        role:
+          type: string
+          enum: ["user", "assistant", "system"]
+        content:
+          type: string
+          maxLength: 10000
+        timestamp:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          nullable: true
+```
+
+## 3. Error Responses
+
+### 3.1 Standard Error Format
+All error responses follow this format:
+```json
+{
+  "success": false,
+  "error": {
+    "type": "string - Error type identifier",
+    "message": "string - Human-readable error message",
+    "code": "integer - HTTP status code",
+    "details": "object - Additional error details (optional)"
+  }
+}
+```
+
+### 3.2 Common Error Types
+- `AUTHENTICATION_ERROR`: Invalid or expired JWT token
+- `VALIDATION_ERROR`: Request body validation failed
+- `AI_SERVICE_UNAVAILABLE`: OpenAI API temporarily unavailable
+- `RATE_LIMIT_EXCEEDED`: Too many requests in a time period
+- `CONVERSATION_NOT_FOUND`: Specified conversation doesn't exist for user
+
+## 4. Rate Limits
+
+### 4.1 Per-User Limits
+- **Chat Endpoint**: 100 requests per hour per user
+- **Conversations List**: 1000 requests per hour per user
+- **Messages Retrieval**: 1000 requests per hour per user
+
+### 4.2 Rate Limit Headers
+Successful responses include:
+- `X-RateLimit-Limit`: Maximum requests allowed
+- `X-RateLimit-Remaining`: Remaining requests
+- `X-RateLimit-Reset`: Time when counter resets
+
+## 5. Security Headers
+
+### 5.1 Required Headers
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `X-XSS-Protection: 1; mode=block`
+
+## 6. API Documentation
+
+### 6.1 Interactive Documentation
+- Available at `/api/v1/docs` (Swagger UI)
+- Available at `/api/v1/redoc` (Redoc)
+- Auto-generated from FastAPI annotations
+
+### 6.2 Schema Validation
+- All requests validated against JSON Schema
+- All responses validated before sending
+- Detailed error messages for validation failures
