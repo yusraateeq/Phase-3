@@ -193,6 +193,23 @@ def delete_task(task_id: str) -> str:
         return f"Task '{title}' deleted successfully"
 
 @mcp.tool()
+def delete_all_tasks(user_id: str) -> str:
+    """
+    Delete all tasks for a specific user.
+    
+    Args:
+        user_id: The UUID of the user.
+    """
+    with Session(engine) as session:
+        stmt = select(Task).where(Task.user_id == UUID(user_id))
+        tasks = session.exec(stmt).all()
+        count = len(tasks)
+        for task in tasks:
+            session.delete(task)
+        session.commit()
+        return f"Successfully deleted all {count} tasks."
+
+@mcp.tool()
 def search_tasks(user_id: str, query: str) -> List[dict]:
     """
     Search for tasks by title or description (case-insensitive).

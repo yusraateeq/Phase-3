@@ -20,11 +20,12 @@ class Settings(BaseSettings):
     # CORS Configuration
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 
-    # OpenAI Configuration
+    # OpenAI / Gemini Configuration
     OPENAI_API_KEY: str = ""
     OPENAI_API_BASE: str = "https://api.openai.com/v1"
     OPENAI_MODEL: str = "gpt-4o"
     OPENAI_MAX_TOKENS: int = 512
+    GEMINI_API_KEY: str = ""
 
     # Application Settings
     APP_NAME: str = "Todo Backend API"

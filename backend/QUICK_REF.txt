@@ -1,0 +1,61 @@
+# Quick Reference Card
+
+## The Problem
+```
+Error: No module named 'openai'
+(or 'core', 'api', 'ai', etc.)
+```
+
+## The Solution (3 Ways)
+
+### 1️⃣ EASIEST - Use Startup Script
+```powershell
+cd backend
+python run_backend.py
+```
+✓ Automatic path setup
+✓ Import validation
+✓ Best error messages
+
+### 2️⃣ Manual PYTHONPATH (PowerShell)
+```powershell
+cd backend
+$env:PYTHONPATH = "${PWD}\src;$env:PYTHONPATH"
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+### 3️⃣ Use Batch File (CMD)
+```cmd
+cd backend
+run.bat
+```
+
+## Test It Works
+```powershell
+curl http://localhost:8000/health
+```
+
+## Install Missing Packages
+```powershell
+pip install openai langchain langchain-openai langchain-community email-validator
+```
+
+## Port In Use?
+```powershell
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+```
+
+## Files
+| File | Purpose |
+|------|---------|
+| `run_backend.py` | ← Use this |
+| `run.bat` | Windows batch |
+| `run.ps1` | PowerShell |
+| `START_HERE.md` | Full instructions |
+
+## Remember
+🔑 **Always set PYTHONPATH or use run_backend.py**
+
+Don't run: `python -m uvicorn main:app` (will fail)
+Do run: `python run_backend.py` (will work)

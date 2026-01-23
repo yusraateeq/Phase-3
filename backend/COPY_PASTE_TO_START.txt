@@ -1,0 +1,10 @@
+# COPY-PASTE THIS COMMAND TO START THE BACKEND
+
+# For PowerShell:
+cd "\\wsl.localhost\Ubuntu-24.04\home\yusraa\Phase-3\Phase-3\backend"; $env:PYTHONPATH = "${PWD}\src"; python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+# For CMD:
+cd \\wsl.localhost\Ubuntu-24.04\home\yusraa\Phase-3\Phase-3\backend & set PYTHONPATH=%CD%\src & python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+# Or run this batch file:
+..\backend\START_BACKEND.bat

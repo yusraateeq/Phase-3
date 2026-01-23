@@ -40,3 +40,4 @@ openai>=1.0.0
 langchain>=0.0.300
 langchain-openai>=0.0.5
 langchain-community>=0.0.19
+fastmcp>=0.1.0

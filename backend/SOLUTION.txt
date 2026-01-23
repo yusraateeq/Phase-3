@@ -1,0 +1,28 @@
+# ===== SOLUTION =====
+# Your backend is NOT running on port 8000
+# That's why you're getting 500 errors - there's no server to respond!
+
+# COPY ONE OF THESE COMMANDS AND RUN IT IN A TERMINAL:
+
+# ===== OPTION 1: PowerShell (Recommended) =====
+cd "\\wsl.localhost\Ubuntu-24.04\home\yusraa\Phase-3\Phase-3\backend"; $env:PYTHONPATH = "${PWD}\src"; python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+
+# ===== OPTION 2: Windows CMD =====
+cd \\wsl.localhost\Ubuntu-24.04\home\yusraa\Phase-3\Phase-3\backend && set PYTHONPATH=%CD%\src && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+
+# ===== OPTION 3: Use batch file =====
+# Just double-click this file from file explorer:
+\\wsl.localhost\Ubuntu-24.04\home\yusraa\Phase-3\Phase-3\backend\START_BACKEND.bat
+
+
+# ===== AFTER STARTING THE BACKEND =====
+# You should see output like:
+# INFO:     Uvicorn running on http://0.0.0.0:8000
+# INFO:     Application startup complete
+
+# Then test with:
+# curl http://localhost:8000/health
+
+# If you see JSON response with {"status":"healthy",...} then it's working!

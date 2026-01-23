@@ -114,6 +114,7 @@ from sqlmodel import Session, select
 from pydantic import BaseModel
 from typing import List, Annotated, Optional
 from uuid import UUID
+import logging
 
 from core.database import get_session
 from api.dependencies import get_current_user
@@ -121,6 +122,7 @@ from models.user import User
 from models.chat import Conversation, Message, MessageRole
 # from ai.agent import TodoAgent (Removed in favor of SmartAgent)
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -140,57 +142,71 @@ async def chat(
     current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)]
 ):
-    # 1. Conversation
-    if request.conversation_id:
-        conversation = session.get(Conversation, request.conversation_id)
-        if not conversation or conversation.user_id != current_user.id:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-    else:
-        conversation = Conversation(user_id=current_user.id)
-        session.add(conversation)
+    try:
+        # 1. Conversation
+        if request.conversation_id:
+            conversation = session.get(Conversation, request.conversation_id)
+            if not conversation or conversation.user_id != current_user.id:
+                raise HTTPException(status_code=404, detail="Conversation not found")
+        else:
+            conversation = Conversation(user_id=current_user.id)
+            session.add(conversation)
+            session.commit()
+            session.refresh(conversation)
+
+        # 2. Save user message
+        user_msg = Message(
+            conversation_id=conversation.id,
+            role=MessageRole.USER,
+            content=request.message
+        )
+        session.add(user_msg)
         session.commit()
-        session.refresh(conversation)
 
-    # 2. Save user message
-    user_msg = Message(
-        conversation_id=conversation.id,
-        role=MessageRole.USER,
-        content=request.message
-    )
-    session.add(user_msg)
-    session.commit()
+        # 3. Load history
+        stmt = (
+            select(Message)
+            .where(Message.conversation_id == conversation.id)
+            .order_by(Message.timestamp)
+        )
+        messages = session.exec(stmt).all()
 
-    # 3. Load history
-    stmt = (
-        select(Message)
-        .where(Message.conversation_id == conversation.id)
-        .order_by(Message.timestamp)
-    )
-    messages = session.exec(stmt).all()
+        chat_history = [
+            {"role": m.role.value, "content": m.content}
+            for m in messages[:-1]
+        ]
 
-    chat_history = [
-        {"role": m.role.value, "content": m.content}
-        for m in messages[:-1]
-    ]
+        # 4. Run Agent (SmartAgent)
+        try:
+            from ai.smart_agent import SmartAgent
+            agent = SmartAgent(session=session, user_id=current_user.id)
+            bot_response = await agent.run(request.message, chat_history)
+        except Exception as agent_error:
+            logger.error(f"SmartAgent error: {str(agent_error)}", exc_info=True)
+            # Fallback response if agent fails
+            bot_response = f"I encountered an error: {str(agent_error)[:100]}. Please try again."
 
-    # 4. Run Agent (SmartAgent)
-    from ai.smart_agent import SmartAgent
-    agent = SmartAgent(session=session, user_id=current_user.id)
-    bot_response = await agent.run(request.message, chat_history)
+        # 5. Save assistant reply
+        bot_msg = Message(
+            conversation_id=conversation.id,
+            role=MessageRole.ASSISTANT,
+            content=bot_response
+        )
+        session.add(bot_msg)
+        session.commit()
 
-    # 5. Save assistant reply
-    bot_msg = Message(
-        conversation_id=conversation.id,
-        role=MessageRole.ASSISTANT,
-        content=bot_response
-    )
-    session.add(bot_msg)
-    session.commit()
-
-    return ChatResponse(
-        message=bot_response,
-        conversation_id=conversation.id
-    )
+        return ChatResponse(
+            message=bot_response,
+            conversation_id=conversation.id
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Chat endpoint error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 
 @router.get("/conversations", response_model=List[Conversation])

@@ -7,7 +7,7 @@ from openai import AsyncOpenAI
 from sqlmodel import Session
 
 from core.config import settings
-from ai.mcp_server import list_tasks, add_task, update_task_status, search_tasks
+from ai.mcp_server import list_tasks, add_task, update_task_status, search_tasks, delete_all_tasks
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -121,13 +121,25 @@ class SmartAgent:
                 "type": "function",
                 "function": {
                     "name": "delete_task",
-                    "description": "Remove a task from the list.",
+                    "description": "Remove a single task from the list.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "task_id": {"type": "string", "description": "The UUID or the exact Title of the task to delete"}
                         },
                         "required": ["task_id"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "delete_all_tasks",
+                    "description": "Remove EVERY task in my todo list.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
                     }
                 }
             }
@@ -137,19 +149,23 @@ class SmartAgent:
         """
         Run the agent loop with model fallback for 429 errors.
         """
-        messages = [
-            {"role": "system", "content": "You are a helpful Todo AI assistant. You can manage tasks directly (Add, List, Update, Delete). Perform requested actions immediately if the user is clear. If a UUID is not available, you can use the exact Task Title instead. Only ask for confirmation or clarify if the request is truly ambiguous."}
-        ]
-        
-        if chat_history:
-            for msg in chat_history:
-                messages.append(msg)
-        
-        messages.append({"role": "user", "content": user_message})
-
-        # First Call
         try:
+            messages = [
+                {"role": "system", "content": "You are a helpful Todo AI assistant. You can manage tasks directly (Add, List, Update, Delete). You can also delete ALL tasks if requested. Perform requested actions immediately if the user is clear. If a UUID is not available, you can use the exact Task Title instead. Only ask for confirmation or clarify if the request is truly ambiguous."}
+            ]
+            
+            if chat_history:
+                for msg in chat_history:
+                    messages.append(msg)
+            
+            messages.append({"role": "user", "content": user_message})
+
+            logger.info(f"SmartAgent calling LLM with {len(messages)} messages")
+            
+            # First Call
             response_message = await self._call_llm(messages, tools=self.tools)
+            
+            logger.info(f"SmartAgent got response: {type(response_message)}")
             
             # If no tool calls, just return the text
             if not response_message.tool_calls:
@@ -176,24 +192,18 @@ class SmartAgent:
             return final_response.content
 
         except Exception as e:
-            logger.error(f"SmartAgent Error: {e}")
-            return f"Sorry, I encountered an error: {str(e)}"
+            logger.error(f"SmartAgent Error: {str(e)}", exc_info=True)
+            # Return a user-friendly error message instead of raising
+            return f"Sorry, I encountered an error processing your request: {str(e)[:100]}"
 
     async def _call_llm(self, messages: List[dict], tools: Optional[List[dict]] = None):
         """Helper to call LLM with fallback for 429 errors."""
         models = [
             self.model,
-            "google/gemini-2.0-flash-exp:free",
-            "google/gemini-flash-1.5:free",
-            "google/gemini-flash-1.5-8b:free",
-            "meta-llama/llama-3.1-8b-instruct:free",
-            "meta-llama/llama-3.2-3b-instruct:free",
-            "mistralai/mistral-7b-instruct:free",
-            "mistralai/pixtral-12b:free",
-            "deepseek/deepseek-r1:free",
-            "qwen/qwen-2-7b-instruct:free",
-            "gryphe/mythomist-7b:free",
-            "openchat/openchat-7b:free",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-exp",
+            "gemini-1.5-flash-latest",
+            "gemini-flash-latest",
         ]
         
         last_error = None
@@ -209,19 +219,36 @@ class SmartAgent:
                     kwargs["tool_choice"] = "auto"
                 
                 response = await self.client.chat.completions.create(**kwargs)
-                return response.choices[0].message
+                
+                # Extract the message from response
+                if not response or not response.choices:
+                    logger.warning(f"Empty response from {model_name}")
+                    continue
+                
+                message = response.choices[0].message
+                
+                # Ensure message has the expected structure
+                if not message:
+                    logger.warning(f"No message in response from {model_name}")
+                    continue
+                    
+                return message
+                
             except Exception as e:
                 last_error = e
-                # If it's a rate limit (429), not found (404), or other transient provider error, try next model
                 error_str = str(e).lower()
-                transient_errors = ["429", "rate_limit", "404", "not found", "502", "503", "timeout", "connection"]
+                # If it's a rate limit (429), not found (404), or other transient provider error, try next model
+                transient_errors = ["429", "rate_limit", "404", "not found", "502", "503", "timeout", "connection", "model not found"]
                 if any(err in error_str for err in transient_errors):
-                    logger.warning(f"Model {model_name} failed with error {e}, trying next...")
+                    logger.warning(f"Model {model_name} failed with transient error: {e}, trying next...")
                     continue
-                # For other errors, re-raise
-                raise e
+                # For other errors, log and try next model instead of re-raising immediately
+                logger.error(f"Model {model_name} failed with error: {e}, trying next...")
+                continue
         
-        raise last_error
+        # If all models failed, raise the last error with context
+        logger.error(f"All models failed. Last error: {last_error}")
+        raise Exception(f"All LLM models failed. Last error: {str(last_error)}")
 
     async def _execute_tool(self, name: str, args: dict) -> Any:
         """Execute the mapped internal functions mimicking MCP behavior."""
@@ -251,6 +278,9 @@ class SmartAgent:
                 if "user_id" in args: del args["user_id"]
                 from ai.mcp_server import delete_task
                 return delete_task(**args)
+            elif name == "delete_all_tasks":
+                from ai.mcp_server import delete_all_tasks
+                return delete_all_tasks(**args)
             else:
                 return {"error": "Unknown tool"}
         except Exception as e:
