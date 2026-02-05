@@ -1,0 +1,6 @@
+Testing Key: AIzaS...
+Base URL: https://generativelanguage.googleapis.com/v1beta/openai/
+Model: gemini-flash-latest
+Full URL: https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+Status Code: 200
+Response: {"choices":[{"finish_reason":"stop","index":0,"message":{"content":"Hello there! How can I help you today?","role":"assistant"}}],"created":1770299912,"id":"CKKEadWaDNGQkdUPnvvV6Ag","model":"gemini-flash-latest","object":"chat.completion","usage":{"completion_tokens":10,"prompt_tokens":2,"total_tokens":12}}
